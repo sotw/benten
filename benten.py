@@ -7,6 +7,7 @@ import argparse
 import logging
 import urllib
 import requests
+import sqlite3
 #import textwrap
 from os.path import expanduser
 from subprocess import PIPE
@@ -33,6 +34,8 @@ global LINKS
 global ctl
 global staticStr
 global ScreenI
+global stockdb
+global cursor
 
 staticStr = 'https://tw.stock.yahoo.com/quote/'
 LINKS = []
@@ -79,13 +82,16 @@ def paintRED(string,target):
 	string = string.replace(target, clrTx(target,'RED'))
 	return string
 
-def doStuff(tTarget,num):
+def doStuff(tTarget,id):
 	global ScreenI
+	global stockdb
+	global cursor
 	updownSymbol = u'\u2197'
-	nums = num.split(":")
-	num = nums[0]
-	my_price = nums[1]	
-	resp = requests.get(tTarget+num)
+	num = id
+	cursor.execute(f"SELECT COST FROM SOI WHERE ID={num}")
+	my_prices = cursor.fetchone()
+	my_price = my_prices[0]
+	resp = requests.get(tTarget+str(num))
 	data = resp.text
 	#
 	# print(data)
@@ -142,27 +148,18 @@ def doStuff(tTarget,num):
 	target_price = Decimal(Decimal(my_price)*Decimal('1.3'))
 	ai_comment = " No comment"
 	if diff > 0:
-		ai_comment = " Hold! you don't earn enough!"
+		ai_comment = " Hold! you did not earn enough!"
 	if Decimal(price) - target_price > 0 :
 		return_of_investiment = f"{((Decimal(price)-Decimal(my_price))/Decimal(my_price))*100:.2f}"
 		ai_comment = f" Sell, current performance is +{return_of_investiment}%"
 	if diff < 0:
 		ai_comment = " https://www.youtube.com/watch?v=M2qroMuIluI&ab_channel=MaestroZiikos"
 	ScreenI.append({'serial':num, 'title':mytitle, 'cost':my_price, 'price':price, 'updownsymbol':updownSymbol,'diff':diff, 'target_price':target_price, 'ai':ai_comment,'updownvalue':my_tread_num})
-	#ScreenI.append(content.text)
-
-	#tNames = re.findall('<input type="hidden" name="stkname" value="(.+?)">',repr(result),re.DOTALL)
-    #print len(headLines)
-    #raw_input()
-	#print(headLines)
-	#for headLine in headLines:
-	
-	#	ScreenI.append(headLine)
-        #print clrTx(headLine[1],'YELLOW')
-		#for tName in tNames:
-		#	ScreenI.append(clrTx(num,'YELLOW')+'('+tName+'):'+headLine)
-		#	break
-	
+	#print(f"INSERT OR REPLACE INTO SOI(ID, TITLE, COST, PRICE, UPDOWNSYMBOL, DIFF, TARGET_PRICE, AI, UPDOWNVALUE) values({str(num)},\
+	#	'{str(mytitle)}','{str(my_price)}','{str(price)}','{str(updownSymbol)}','{str(diff)}','{str(target_price)}','{ai_comment}','{str(my_tread_num)}')")
+	cursor.execute(f"INSERT OR REPLACE INTO SOI(ID, TITLE, COST, PRICE, UPDOWNSYMBOL, DIFF, TARGET_PRICE, AI, UPDOWNVALUE) values({str(num)},\
+		'{str(mytitle)}','{str(my_price)}','{str(price)}','{str(updownSymbol)}','{str(diff)}','{str(target_price)}','{ai_comment}','{str(my_tread_num)}')")
+	stockdb.commit()
  
 def setup_logging(level):
 	global DB
@@ -180,10 +177,12 @@ def verify():
 	parser.add_argument('-v', '--verbose', dest='verbose', action = 'store_true', default=False, help='Verbose mode')
 	parser.add_argument('query', nargs='*', default=None)
 	parser.add_argument('-d', '--database', dest='database', action = 'store', default='/.benten/benten.db') #replace
+	parser.add_argument('-q', '--sqlite3', dest='sql3db', action = 'store', default='/.benten/benten.db3') #replace
 	parser.add_argument('-a', '--add', dest='add', action = 'store_true', default=False, help='add stock number and price you bought or intent to bought')
-	parser.add_argument('-r', '--read', dest='read', action = 'store_true', default=False, help='dump current monitor list')
+	parser.add_argument('-r', '--read', dest='read', action = 'store_true', default=False, help='dump current monitor record')
 	parser.add_argument('-k', '--kill', dest='kill', action = 'store_true', default=False, help='remove a stock from monitor list')
-	parser.add_argument('-l', '--list', dest='listme', action = 'store_true', default=False, help='show current price,etc')
+	parser.add_argument('-l', '--list', dest='listme', action = 'store_true', default=False, help='old interface, reserved')
+	parser.add_argument('-u', '--update', dest='updateme', action = 'store_true', default=False, help='fetch current price,etc')
 	args = parser.parse_args()
 	tTarget = ' '.join(args.query)
 	log_level = logging.INFO
@@ -196,13 +195,16 @@ def verify():
 		print("Flag conflict, some flag are exclusive")
 		parser.print_help()
 		exit()
-	if not args.read and not args.kill and not args.add and not args.listme:
+	if not args.read and not args.kill and not args.add and not args.listme and not args.updateme:
 		parser.print_help()
 		exit()
 	setup_logging(log_level)
 
 def refreshDb():
 	global ARGUDB
+	global DB
+	global stockdb
+	global cursor
 	ARGUDB = []
 	home = expanduser('~')
 	if os.path.isfile(home+args.database) is True:
@@ -215,20 +217,66 @@ def refreshDb():
 		f.close()
 	else:
 		DB.debug('override file is not exist')
+	stockdb = sqlite3.connect(home+args.sql3db)
+	cursor = stockdb.cursor()
+	DB.info("sqlite3 databse connected")
+	cursor.execute('''CREATE TABLE IF NOT EXISTS SOI
+	(ID INT PRIMARY KEY NOT NULL,
+	TITLE TEXT,
+	COST TEXT NOT NULL,
+	PRICE TEXT,
+	UPDOWNSYMBOL TEXT,
+	DIFF TEXT,
+	TARGET_PRICE TEXT,
+	AI TEXT,
+	UPDOWNVALUE TEXT
+	);''')
+	DB.info("table created or existed")
+	stockdb.commit()
 
 def	doDump():
-	for entry in ARGUDB:
-		print(entry)
+	#for entry in ARGUDB:
+	#	print(entry)
+	global stockdb
+	global cursor	
+	global ScreenI
+	ScreenI.clear()
+	print("|"+clrTx("Serial","CYAN")+"|"+clrTx("    Name","CYAN")+"|"+clrTx("    Cost","CYAN")+"|"+clrTx(" Current","CYAN")+ \
+		"|"+clrTx("   Trend","CYAN")+"|"+clrTx("    Diff","CYAN")+"|"+clrTx("  Target","CYAN")+"|"+clrTx(" AI COMMENT","CYAN"))
+
+	cursor.execute(f"SELECT * FROM SOI")
+
+	for record in cursor.fetchall():
+		#print(record)		
+		ScreenI.append({'serial':record[0], 'title':record[1], 'cost':record[2], 'price':record[3], 'updownsymbol':record[4],\
+			'diff':record[5], 'target_price':record[6], 'ai':record[7],'updownvalue':record[8]})
+
+	for item in ScreenI:
+		updownstring = f"{item['updownsymbol']} {Decimal(item['updownvalue']):>2.3f}"
+		target_str = f"|{item['serial']:>6}|{item['title']:>6}|{item['cost']:>8}|{Decimal(item['price']):>8.2f}|{updownstring:>8}|{Decimal(item['diff']):>8.2f}|{Decimal(item['target_price']):>8.3f}|{item['ai']}" 
+		if item['updownsymbol'] == u'\u2197':
+			print(clrTx(target_str,"RED"))
+		elif item['updownsymbol'] == u'\u2198':
+			print(clrTx(target_str,"GREEN"))
+		elif item['updownsymbol'] == u'\u2192':
+			print(clrTx(target_str,"WHITE"))
 
 def doDumpEx():
 	global ScreenI
+	global stockdb
+	global cursor
 	max_entrys = len(ARGUDB)
 	curr_idx = 0
-	for entry in ARGUDB:
+	#for entry in ARGUDB:
+	#	curr_idx+=1
+	#	print(f"Handling {curr_idx}/{max_entrys}", end='\r')
+	#	doStuff(staticStr,entry)
+	cursor.execute(f"SELECT ID FROM SOI")
+	for id in cursor.fetchall():
 		curr_idx+=1
-		print(f"Handling {curr_idx}/{max_entrys}", end='\r')
-		doStuff(staticStr,entry)
-
+		print(f"Handling {curr_idx}/{max_entrys}", end='\r')		
+		doStuff(staticStr,id[0])
+		
 	print("|"+clrTx("Serial","CYAN")+"|"+clrTx("    Name","CYAN")+"|"+clrTx("    Cost","CYAN")+"|"+clrTx(" Current","CYAN")+ \
 		"|"+clrTx("   Trend","CYAN")+"|"+clrTx("    Diff","CYAN")+"|"+clrTx("  Target","CYAN")+"|"+clrTx(" AI COMMENT","CYAN"))
 	
@@ -243,10 +291,15 @@ def doDumpEx():
 			print(clrTx(target_str,"WHITE"))
 
 def doWriteLn(msg):
+	global DB
+	global stockdb
+	global cursor
 	msgs = msg.split(":")
 	if(len(msgs) !=2):
 		print(clrTx("you need to input get_stock -a [stock_num]:[my_base_price]",'YELLOW'))
 	home = expanduser('~')
+	cursor.execute(f"INSERT OR REPLACE INTO SOI(ID, COST) values({msgs[0]},{msgs[1]})")
+	stockdb.commit()
 	f = open(home+args.database,'a')
 	hit_flag = 0
 	hit_index = 0
@@ -283,14 +336,17 @@ def doKillALn(number):
 
 def main():
 	#doStuff(tTarget)
+	global stockdb
+	global cursor
 	if args.read :
 		doDump()
 	elif args.kill:
 		doKillALn(tTarget)
 	elif args.add:
 		doWriteLn(tTarget)
-	elif args.listme:
+	elif args.updateme:
 		doDumpEx()
+	stockdb.close()
 
 if __name__ == '__main__':
 	verify()
