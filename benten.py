@@ -166,7 +166,7 @@ def doStuff(tTarget,num):
  
 def setup_logging(level):
 	global DB
-	DB = logging.getLogger('get_stock') #replace
+	DB = logging.getLogger('benten') #replace
 	DB.setLevel(level)
 	handler = logging.StreamHandler(sys.stdout)
 	handler.setFormatter(logging.Formatter('%(module)s %(levelname)s %(funcName)s| %(message)s'))
@@ -176,10 +176,10 @@ def verify():
 	global tTarget
 	global args
 
-	parser = argparse.ArgumentParser(description='A get_stock Utility') #replace
+	parser = argparse.ArgumentParser(description='This benten ( Benzaiten ) is a personal Taiwan stock analyzer') #replace
 	parser.add_argument('-v', '--verbose', dest='verbose', action = 'store_true', default=False, help='Verbose mode')
 	parser.add_argument('query', nargs='*', default=None)
-	parser.add_argument('-d', '--database', dest='database', action = 'store', default='/.hmDict/get_stock.db') #replace
+	parser.add_argument('-d', '--database', dest='database', action = 'store', default='/.benten/benten.db') #replace
 	parser.add_argument('-a', '--add', dest='add', action = 'store_true', default=False, help='add stock number and price you bought or intent to bought')
 	parser.add_argument('-r', '--read', dest='read', action = 'store_true', default=False, help='dump current monitor list')
 	parser.add_argument('-k', '--kill', dest='kill', action = 'store_true', default=False, help='remove a stock from monitor list')
