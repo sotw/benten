@@ -8,7 +8,7 @@ rm -vf ~/bin/sh/benten
 mkdir -p ~/bin/sh
 mkdir -p $INSFOLDER
 cp -vf *.py $INSFOLDER
-cp -vf get_stock ~/bin/sh
+cp -vf benten ~/bin/sh
 cp -vf *.db $INSFOLDER
 
 sudo apt install python3-pip

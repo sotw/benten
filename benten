@@ -1,4 +1,4 @@
-PKGFOLDER=~/.banten
+PKGFOLDER=~/.benten
 exeName=$0
 exeName=${exeName##*/}
 exeName=${exeName%.*}
