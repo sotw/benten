@@ -12,10 +12,11 @@ cp -vf benten ~/bin/sh
 cp -vf *.db $INSFOLDER
 
 sudo apt install python3-pip
-sudo pip install lxml
+pip install lxml
 #I should seperate this to python deploy
 #sudo pip install re #for wikipedia
-sudo pip install BeautifulSoup4 #for wikipedia
+pip install BeautifulSoup4 #for wikipedia
+pip install requests
 sudo apt install python3-lxml
 chmod -R 755 $INSFOLDER
 chmod -R 755 ~/bin/sh

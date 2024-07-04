@@ -185,7 +185,7 @@ def verify():
 	parser.add_argument('-u', '--update', dest='updateme', action = 'store_true', default=False, help='fetch current price,etc')
 	args = parser.parse_args()
 	tTarget = ' '.join(args.query)
-	log_level = logging.INFO
+	log_level = logging.WARNING
 	if args.verbose:
 		log_level = logging.DEBUG
 	#if not tTarget:
